@@ -9,12 +9,12 @@
       <div class="field" id="artisanCompanyField" style="display:none">
         <label>Nom exact de la société *</label>
         <input id="authCompany" maxlength="160" autocomplete="organization" placeholder="Raison sociale officielle">
-        <small>Le nom doit correspondre exactement au registre officiel.</small>
+        <small>Le nom doit correspondre au registre officiel.</small>
       </div>
       <div class="field" id="artisanSiretField" style="display:none">
         <label>SIRET *</label>
         <input id="authSiret" inputmode="numeric" maxlength="17" autocomplete="off" placeholder="14 chiffres">
-        <small>Le SIRET est vérifié automatiquement auprès de l’API officielle Recherche d’entreprises.</small>
+        <small>Le SIRET est vérifié automatiquement auprès du registre officiel.</small>
       </div>`)
   }
 
@@ -59,13 +59,18 @@
     const email = $('authEmail').value.trim().toLowerCase()
     const password = $('authPassword').value
     const full_name = $('authName').value.trim()
-    const company_name = (companyInput?.value || '').trim()
-    const siret = (siretInput?.value || '').replace(/\D/g, '')
+    // Re-read the DOM at submit time so mobile browsers cannot leave stale references.
+    // Compatibility: if an older cached page only shows "Nom complet", use it as company name.
+    const companyEl = document.getElementById('authCompany')
+    const siretEl = document.getElementById('authSiret')
+    const company_name = (companyEl?.value || full_name || '').trim()
+    const siret = (siretEl?.value || '').replace(/\D/g, '')
     const button = $('authSubmit')
     const out = $('authMsg')
     const showMsg = (text, cls='') => { if(out) out.innerHTML = `<div class="notice ${cls}">${String(text).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]))}</div>` }
 
     if (!company_name) return showMsg('Le nom de la société est obligatoire.', 'error')
+    if (!siretEl) return showMsg('Le champ SIRET ne s’est pas chargé. Actualisez la page puis réessayez.', 'error')
     if (!/^\d{14}$/.test(siret)) return showMsg('Le SIRET doit contenir exactement 14 chiffres.', 'error')
     if (!full_name) return showMsg('Indiquez votre nom complet.', 'error')
     if (password.length < 8 || !/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) return showMsg('Le mot de passe doit contenir au moins 8 caractères, avec une lettre et un chiffre.', 'error')
