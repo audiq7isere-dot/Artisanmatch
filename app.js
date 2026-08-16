@@ -12,11 +12,24 @@ const $ = id => document.getElementById(id)
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]))
 const msg = (id,t,c='') => { const el=$(id); if(el) el.innerHTML=`<div class="notice ${c}">${esc(t)}</div>` }
 
+function syncArtisanSignupFields(){
+  const show = mode === 'signup' && role === 'artisan'
+  const companyField = $('artisanCompanyField')
+  const siretField = $('artisanSiretField')
+  const companyInput = $('authCompany')
+  const siretInput = $('authSiret')
+  if(companyField) companyField.style.display = show ? 'grid' : 'none'
+  if(siretField) siretField.style.display = show ? 'grid' : 'none'
+  if(companyInput) companyInput.required = show
+  if(siretInput) siretInput.required = show
+}
+
 window.closeModal = id => $(id)?.classList.remove('open')
 window.setRole = r => {
   role = r
   $('clientRole')?.classList.toggle('active', r === 'client')
   $('artisanRole')?.classList.toggle('active', r === 'artisan')
+  syncArtisanSignupFields()
 }
 
 window.openAuth = (m='login', r='client') => {
@@ -31,6 +44,7 @@ window.openAuth = (m='login', r='client') => {
     : 'Déjà inscrit ? <a href="#" id="switchAuth">Se connecter</a>'
   $('authMsg').innerHTML = ''
   $('authModal').classList.add('open')
+  syncArtisanSignupFields()
   setTimeout(() => {
     const sw = $('switchAuth')
     if(sw) sw.onclick = e => { e.preventDefault(); openAuth(m === 'login' ? 'signup' : 'login', role) }
@@ -54,9 +68,19 @@ $('authForm').onsubmit = async e => {
       if(password.length < 8 || !/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
         return msg('authMsg','Le mot de passe doit contenir au moins 8 caractères, avec une lettre et un chiffre.','error')
       }
-      const {data,error} = await sb.functions.invoke('register-user',{body:{email,password,full_name,role}})
-      if(error) return msg('authMsg','Impossible de créer le compte. Réessayez.','error')
-      if(!data?.ok) return msg('authMsg',data?.error || 'Impossible de créer le compte.','error')
+      if(role === 'artisan'){
+        const company_name = $('authCompany')?.value.trim() || ''
+        const siret = ($('authSiret')?.value || '').replace(/\D/g,'')
+        if(!company_name) return msg('authMsg','Le nom exact de la société est obligatoire.','error')
+        if(!/^\d{14}$/.test(siret)) return msg('authMsg','Le SIRET doit contenir exactement 14 chiffres.','error')
+        const {data,error} = await sb.functions.invoke('register-user',{body:{email,password,full_name,role,company_name,siret}})
+        if(error) return msg('authMsg','Impossible de vérifier le SIRET pour le moment. Réessayez.','error')
+        if(!data?.ok) return msg('authMsg',data?.error || 'Le SIRET ou le nom de société ne correspondent pas.','error')
+      } else {
+        const {data,error} = await sb.functions.invoke('register-user',{body:{email,password,full_name,role}})
+        if(error) return msg('authMsg','Impossible de créer le compte. Réessayez.','error')
+        if(!data?.ok) return msg('authMsg',data?.error || 'Impossible de créer le compte.','error')
+      }
       const login = await sb.auth.signInWithPassword({email,password})
       if(login.error) return msg('authMsg','Compte créé. Cliquez sur Connexion et utilisez vos identifiants.','success')
       session = login.data.session
