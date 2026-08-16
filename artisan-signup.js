@@ -13,7 +13,7 @@
       </div>
       <div class="field" id="artisanSiretField" style="display:none">
         <label>SIRET *</label>
-        <input id="authSiret" inputmode="numeric" maxlength="17" autocomplete="off" placeholder="14 chiffres">
+        <input id="authSiret" type="text" inputmode="numeric" pattern="[0-9]{14}" minlength="14" maxlength="14" autocomplete="off" placeholder="14 chiffres">
         <small>Le SIRET est vérifié automatiquement auprès du registre officiel.</small>
       </div>`)
   }
@@ -40,9 +40,11 @@
   document.addEventListener('click', e => { if (e.target?.id === 'switchAuth') setTimeout(syncFields, 0) })
 
   if (siretInput) {
+    siretInput.setAttribute('maxlength','14')
+    siretInput.setAttribute('minlength','14')
+    siretInput.setAttribute('pattern','[0-9]{14}')
     siretInput.addEventListener('input', () => {
-      const digits = siretInput.value.replace(/\D/g, '').slice(0, 14)
-      siretInput.value = digits.replace(/(\d{3})(?=\d)/g, '$1 ').trim()
+      siretInput.value = siretInput.value.replace(/\D/g, '').slice(0, 14)
     })
   }
 
@@ -59,8 +61,6 @@
     const email = $('authEmail').value.trim().toLowerCase()
     const password = $('authPassword').value
     const full_name = $('authName').value.trim()
-    // Re-read the DOM at submit time so mobile browsers cannot leave stale references.
-    // Compatibility: if an older cached page only shows "Nom complet", use it as company name.
     const companyEl = document.getElementById('authCompany')
     const siretEl = document.getElementById('authSiret')
     const company_name = (companyEl?.value || full_name || '').trim()
