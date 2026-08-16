@@ -2,6 +2,32 @@
   const el = document.getElementById('openProjectsList')
   if (!el || !window.supabase) return
 
+  const openSection = document.getElementById('openProjects')
+  if (openSection && !document.getElementById('popularCategories')) {
+    openSection.insertAdjacentHTML('beforebegin', `
+      <section id="popularCategories" class="categorySection">
+        <div class="wrap">
+          <div class="title"><span class="pill">Trouvez le bon pro</span><h2>Quel projet avez-vous en tête ?</h2><p>Choisissez votre besoin et déposez votre demande en quelques minutes.</p></div>
+          <div class="categoryGrid">
+            <button class="categoryCard catKitchen" onclick="prefillProject('Cuisine')"><span>🍽️</span><strong>Cuisine</strong><small>Pose & rénovation</small></button>
+            <button class="categoryCard catBath" onclick="prefillProject('Salle de bain')"><span>🚿</span><strong>Salle de bain</strong><small>Création & rénovation</small></button>
+            <button class="categoryCard catElec" onclick="prefillProject('Électricité')"><span>⚡</span><strong>Électricité</strong><small>Installation & dépannage</small></button>
+            <button class="categoryCard catPaint" onclick="prefillProject('Peinture')"><span>🎨</span><strong>Peinture</strong><small>Intérieur & extérieur</small></button>
+            <button class="categoryCard catRoof" onclick="prefillProject('Toiture')"><span>🏠</span><strong>Toiture</strong><small>Réparation & rénovation</small></button>
+            <button class="categoryCard catRenov" onclick="prefillProject('Rénovation générale')"><span>🔨</span><strong>Rénovation</strong><small>Projet complet</small></button>
+          </div>
+        </div>
+      </section>`)
+  }
+
+  window.prefillProject = category => {
+    if (typeof window.startProject === 'function') window.startProject()
+    setTimeout(() => {
+      const select = document.getElementById('pCat')
+      if (select) select.value = category
+    }, 30)
+  }
+
   const client = window.supabase.createClient(
     'https://nbhkvxfovrzhvdbdyxmy.supabase.co',
     'sb_publishable_VTcWIZ2ibkOP8coT-GiPXw_XLqiacbZ'
