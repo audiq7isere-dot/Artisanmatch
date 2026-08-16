@@ -7,6 +7,7 @@ let mode = 'login'
 let role = 'client'
 let session = null
 let profile = null
+let justAuthenticated = false
 const $ = id => document.getElementById(id)
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]))
 const msg = (id,t,c='') => { const el=$(id); if(el) el.innerHTML=`<div class="notice ${c}">${esc(t)}</div>` }
@@ -59,14 +60,24 @@ $('authForm').onsubmit = async e => {
       const login = await sb.auth.signInWithPassword({email,password})
       if(login.error) return msg('authMsg','Compte créé. Cliquez sur Connexion et utilisez vos identifiants.','success')
       session = login.data.session
+      justAuthenticated = true
       msg('authMsg','Compte créé et connexion réussie.','success')
     } else {
       const {data,error} = await sb.auth.signInWithPassword({email,password})
       if(error) return msg('authMsg','E-mail ou mot de passe incorrect.','error')
       session = data.session
+      justAuthenticated = true
       msg('authMsg','Connexion réussie.','success')
     }
-    setTimeout(async()=>{ closeModal('authModal'); await state(); await showDashboard() },350)
+    setTimeout(async()=>{
+      closeModal('authModal')
+      await state()
+      await showDashboard()
+      if(justAuthenticated && profile?.role === 'client') {
+        justAuthenticated = false
+        setTimeout(()=>startProject(),250)
+      }
+    },350)
   } catch(err) {
     console.error(err)
     msg('authMsg','Une erreur est survenue. Réessayez.','error')
@@ -91,6 +102,7 @@ async function state(){
     $('loginBtn').style.display='inline-flex'
     $('signupBtn').style.display='inline-flex'
     $('dashBtn').style.display='none'
+    if($('newProjectBtn')) $('newProjectBtn').style.display='none'
     return
   }
   const {data,error}=await sb.from('profiles').select('*').eq('id',session.user.id).single()
@@ -99,11 +111,13 @@ async function state(){
   $('loginBtn').style.display='none'
   $('signupBtn').style.display='none'
   $('dashBtn').style.display='inline-flex'
+  if($('newProjectBtn')) $('newProjectBtn').style.display=profile?.role==='client'?'inline-flex':'none'
   if($('app').classList.contains('show')) await loadDashboard()
 }
 
 $('dashBtn').onclick = showDashboard
 $('logoutBtn').onclick = async()=>{ await sb.auth.signOut(); location.reload() }
+if($('newProjectBtn')) $('newProjectBtn').onclick = ()=>startProject()
 
 async function showDashboard(){
   if(!session) return openAuth('login')
@@ -132,6 +146,7 @@ window.startProject = quick => {
     alert('La création de demande est réservée aux particuliers.')
     return
   }
+  $('projectMsg').innerHTML=''
   $('projectModal').classList.add('open')
 }
 
@@ -153,6 +168,7 @@ async function loadDashboard(){
   if(!profile) return
   $('hello').textContent=profile.role==='artisan'?`Espace artisan — ${profile.company_name||profile.full_name||''}`:`Bonjour ${profile.full_name||''}`
   $('projectsTab').textContent=profile.role==='artisan'?'Opportunités':'Mes demandes'
+  if($('newProjectBtn')) $('newProjectBtn').style.display=profile.role==='client'?'inline-flex':'none'
   if(profile.role==='artisan') await loadArtisan(); else await loadClient()
   renderProfile()
 }
@@ -165,8 +181,8 @@ async function loadClient(){
   const aids=[...new Set(matches.map(m=>m.artisan_id))]
   let artisans=[]
   if(aids.length){ const r=await sb.from('profiles').select('id,full_name,company_name,city,postal_code,trades,verified').in('id',aids); artisans=r.data||[] }
-  $('overview').innerHTML=`<div class="dashGrid"><div class="stat"><strong>${projects.length}</strong><span>demande(s)</span></div><div class="stat"><strong>${matches.length}</strong><span>match(s)</span></div><div class="stat"><strong>${matches.filter(m=>m.status==='interested').length}</strong><span>artisan(s) intéressé(s)</span></div></div><div style="margin-top:18px"><button class="btn primary" onclick="startProject()">+ Nouvelle demande</button></div>`
-  $('projects').innerHTML=projects.length?`<div class="list">${projects.map(p=>{const ms=matches.filter(m=>m.project_id===p.id);return `<div class="item"><span class="badge ${p.status==='matched'?'ok':''}">${esc(p.status)}</span><h3>${esc(p.title)}</h3><div class="meta">${esc(p.category)} • ${esc(p.city)} ${esc(p.postal_code)}</div><p>${esc(p.description)}</p><b>Artisans proposés (${ms.length}/3)</b>${ms.map(m=>{const a=artisans.find(x=>x.id===m.artisan_id)||{};return `<div class="item" style="margin-top:8px"><b>${esc(a.company_name||a.full_name||'Artisan')}</b> ${a.verified?'✓':''}<div class="meta">${esc(a.city)} • score ${m.score}% • ${esc(m.status)}</div></div>`}).join('')}</div>`}).join('')}</div>`:'<div class="notice">Aucune demande pour le moment.</div>'
+  $('overview').innerHTML=`<div class="item" style="margin-bottom:16px"><h2>Besoin d’un artisan ?</h2><p>Déposez votre demande directement depuis votre espace. Vous n’avez pas besoin de revenir à l’accueil.</p><button class="btn primary" onclick="startProject()">+ Déposer une demande</button></div><div class="dashGrid"><div class="stat"><strong>${projects.length}</strong><span>demande(s)</span></div><div class="stat"><strong>${matches.length}</strong><span>match(s)</span></div><div class="stat"><strong>${matches.filter(m=>m.status==='interested').length}</strong><span>artisan(s) intéressé(s)</span></div></div>`
+  $('projects').innerHTML=projects.length?`<div style="margin-bottom:14px"><button class="btn primary" onclick="startProject()">+ Nouvelle demande</button></div><div class="list">${projects.map(p=>{const ms=matches.filter(m=>m.project_id===p.id);return `<div class="item"><span class="badge ${p.status==='matched'?'ok':''}">${esc(p.status)}</span><h3>${esc(p.title)}</h3><div class="meta">${esc(p.category)} • ${esc(p.city)} ${esc(p.postal_code)}</div><p>${esc(p.description)}</p><b>Artisans proposés (${ms.length}/3)</b>${ms.map(m=>{const a=artisans.find(x=>x.id===m.artisan_id)||{};return `<div class="item" style="margin-top:8px"><b>${esc(a.company_name||a.full_name||'Artisan')}</b> ${a.verified?'✓':''}<div class="meta">${esc(a.city)} • score ${m.score}% • ${esc(m.status)}</div></div>`}).join('')}</div>`}).join('')}</div>`:'<div class="item"><h3>Aucune demande pour le moment</h3><p>Commencez en décrivant vos travaux.</p><button class="btn primary" onclick="startProject()">Déposer ma première demande</button></div>'
 }
 
 async function loadArtisan(){
@@ -205,6 +221,6 @@ document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
 boot().then(()=>{
   if(session&&localStorage.getItem('openProject')){
     localStorage.removeItem('openProject')
-    setTimeout(()=>startProject(),300)
+    setTimeout(async()=>{await showDashboard(); startProject()},300)
   }
 }).catch(console.error)
