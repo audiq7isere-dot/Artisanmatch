@@ -7,13 +7,14 @@
   if (nameField && !$('artisanCompanyField')) {
     nameField.insertAdjacentHTML('afterend', `
       <div class="field" id="artisanCompanyField" style="display:none">
-        <label>Nom de la société *</label>
-        <input id="authCompany" autocomplete="organization" placeholder="Raison sociale officielle">
+        <label>Nom exact de la société *</label>
+        <input id="authCompany" maxlength="160" autocomplete="organization" placeholder="Raison sociale officielle">
+        <small>Le nom doit correspondre exactement au registre officiel.</small>
       </div>
       <div class="field" id="artisanSiretField" style="display:none">
         <label>SIRET *</label>
         <input id="authSiret" inputmode="numeric" maxlength="17" autocomplete="off" placeholder="14 chiffres">
-        <small>Le SIRET sera vérifié automatiquement dans le registre public des entreprises.</small>
+        <small>Le SIRET est vérifié automatiquement auprès de l’API officielle Recherche d’entreprises.</small>
       </div>`)
   }
 
@@ -22,12 +23,8 @@
   const companyInput = $('authCompany')
   const siretInput = $('authSiret')
 
-  function isSignup() {
-    return $('roleChoice') && getComputedStyle($('roleChoice')).display !== 'none'
-  }
-  function isArtisan() {
-    return $('artisanRole')?.classList.contains('active')
-  }
+  function isSignup() { return $('roleChoice') && getComputedStyle($('roleChoice')).display !== 'none' }
+  function isArtisan() { return $('artisanRole')?.classList.contains('active') }
   function syncFields() {
     const show = isSignup() && isArtisan()
     if (companyField) companyField.style.display = show ? 'grid' : 'none'
@@ -39,9 +36,8 @@
   $('clientRole')?.addEventListener('click', () => setTimeout(syncFields, 0))
   $('artisanRole')?.addEventListener('click', () => setTimeout(syncFields, 0))
   $('signupBtn')?.addEventListener('click', () => setTimeout(syncFields, 0))
-  document.addEventListener('click', e => {
-    if (e.target?.id === 'switchAuth') setTimeout(syncFields, 0)
-  })
+  $('loginBtn')?.addEventListener('click', () => setTimeout(syncFields, 0))
+  document.addEventListener('click', e => { if (e.target?.id === 'switchAuth') setTimeout(syncFields, 0) })
 
   if (siretInput) {
     siretInput.addEventListener('input', () => {
@@ -75,7 +71,8 @@
     if (password.length < 8 || !/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) return showMsg('Le mot de passe doit contenir au moins 8 caractères, avec une lettre et un chiffre.', 'error')
 
     button.disabled = true
-    showMsg('Vérification du SIRET et de la société…')
+    button.textContent = 'Vérification du SIRET…'
+    showMsg('Vérification du SIRET et du nom de société auprès du registre officiel…')
     try {
       const { data, error } = await sbArtisan.functions.invoke('register-user', {
         body: { email, password, full_name, role: 'artisan', company_name, siret }
@@ -84,19 +81,34 @@
       if (!data?.ok) return showMsg(data?.error || 'Le SIRET ou le nom de société ne correspondent pas.', 'error')
 
       const login = await sbArtisan.auth.signInWithPassword({ email, password })
-      if (login.error) return showMsg('Compte créé. Utilisez maintenant le bouton Connexion.', 'success')
+      if (login.error) return showMsg('Compte vérifié et créé. Utilisez maintenant le bouton Connexion.', 'success')
       showMsg(`SIRET vérifié ✓ — ${data.company_name || company_name}. Compte créé.`, 'success')
-      setTimeout(() => {
-        window.closeModal?.('authModal')
-        window.showDashboard?.()
-      }, 700)
+      setTimeout(() => location.reload(), 700)
     } catch (err) {
       console.error(err)
       showMsg('Une erreur est survenue pendant la vérification. Réessayez.', 'error')
     } finally {
       button.disabled = false
+      button.textContent = 'Créer mon compte'
     }
   }, true)
+
+  const observer = new MutationObserver(() => {
+    const company = $('fCompany'), siret = $('fSiret')
+    if (company && !company.readOnly) {
+      company.readOnly = true
+      company.title = 'Nom vérifié lors de la création du compte'
+    }
+    if (siret && !siret.readOnly) {
+      siret.readOnly = true
+      siret.title = 'SIRET vérifié lors de la création du compte'
+      const parent = siret.closest('.field')
+      if (parent && !parent.querySelector('.legal-verified-note')) {
+        parent.insertAdjacentHTML('beforeend','<small class="legal-verified-note">🔒 SIRET vérifié lors de la création du compte. Contactez ArtisanMatch pour le modifier.</small>')
+      }
+    }
+  })
+  observer.observe(document.body,{subtree:true,childList:true})
 
   syncFields()
 })()
