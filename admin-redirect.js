@@ -21,29 +21,24 @@
     return data?.role === 'admin'
   }
 
-  async function redirectIfAdmin() {
+  async function openDashboard() {
     if (await getAdminState()) {
-      if (!location.pathname.endsWith('/admin.html')) location.href = '/admin.html'
+      location.href = '/admin.html'
       return true
     }
     return false
   }
 
+  // An admin is allowed to stay on the public homepage.
+  // Only the "Mon espace" button sends an admin to the admin dashboard.
   const dashBtn = document.getElementById('dashBtn')
   if (dashBtn) {
     const normalDashboard = dashBtn.onclick
     dashBtn.onclick = async e => {
       e.preventDefault()
-      if (await redirectIfAdmin()) return
+      if (await openDashboard()) return
       if (typeof normalDashboard === 'function') return normalDashboard.call(dashBtn, e)
       if (typeof window.showDashboard === 'function') return window.showDashboard()
     }
   }
-
-  sbAdminRoute.auth.onAuthStateChange(async (event, session) => {
-    if (!session || event === 'SIGNED_OUT') return
-    setTimeout(() => redirectIfAdmin(), 150)
-  })
-
-  setTimeout(() => redirectIfAdmin(), 250)
 })()
