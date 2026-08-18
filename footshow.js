@@ -38,3 +38,4 @@ $('logoutBtn').onclick=async()=>{await sb.auth.signOut();location.reload()};
 const talentCta=document.querySelector('.tagline');
 if(talentCta){talentCta.style.cursor='pointer';talentCta.setAttribute('role','button');talentCta.setAttribute('tabindex','0');const goToVideoUpload=()=>{if(!user){showAuth();$('signupTab')?.click();return}openMyProfile();requestAnimationFrame(()=>{$('actionFile')?.scrollIntoView({behavior:'smooth',block:'center'});$('actionFile')?.focus({preventScroll:true})})};talentCta.addEventListener('click',goToVideoUpload);talentCta.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();goToVideoUpload()}})}
 boot();
+// deployment trigger after Vercel Git connection
