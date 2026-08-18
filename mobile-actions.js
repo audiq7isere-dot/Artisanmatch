@@ -34,4 +34,9 @@ async function openInbox(){
  root.querySelectorAll('[data-v2-chat]').forEach(b=>b.onclick=()=>{d.classList.add('hidden');window.openFootShowConversation?.(b.dataset.v2Chat)});
 }
 window.openFootShowFeedV2=openFeed;window.openFootShowStatsV2=openStats;window.openFootShowInboxV2=openInbox;
+document.addEventListener('click',e=>{
+  if(e.target.closest('#openFeedV2')){e.preventDefault();openFeed();}
+  if(e.target.closest('#openMessagesV2')){e.preventDefault();openInbox();}
+  if(e.target.closest('#openStatsV2')){e.preventDefault();openStats();}
+});
 })();
