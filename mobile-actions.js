@@ -1,6 +1,6 @@
 (()=>{
 const $=id=>document.getElementById(id);
-const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[m]));
 const uid=()=>window.user?.id||(typeof user!=='undefined'?user?.id:null);
 const media=(bucket,path)=>path?sb.storage.from(bucket).getPublicUrl(path).data.publicUrl:'';
 function ensureDrawer(id,title,max='620px'){
@@ -9,13 +9,22 @@ function ensureDrawer(id,title,max='620px'){
  d.innerHTML=`<div class="drawer-inner" style="max-width:${max}"><button class="close" data-close-${id}>×</button><div class="fs-v2-kicker">FOOTSHOW</div><h2>${title}</h2><div id="${id}Content"></div></div>`;
  document.body.appendChild(d);d.querySelector(`[data-close-${id}]`).onclick=()=>d.classList.add('hidden');return d;
 }
+async function addFeedComment(videoId){
+ const me=uid();
+ if(!me){alert('Connecte-toi pour commenter.');return;}
+ const body=prompt('Écrire un commentaire');
+ if(!body?.trim())return;
+ const {error}=await sb.from('comments').insert({video_id:videoId,user_id:me,body:body.trim()});
+ if(error){alert('Commentaire non enregistré : '+error.message);return;}
+ await openFeed();
+}
 async function openFeed(){
  const d=ensureDrawer('feedV2Drawer','📹 Feed','520px'),root=$('feedV2DrawerContent');d.classList.remove('hidden');root.innerHTML='<div class="msg">Chargement du feed…</div>';
  const {data,error}=await sb.from('videos').select('id,user_id,storage_path,action_type,caption,created_at,profiles:user_id(full_name,username,position,category),likes(user_id),comments(id)').order('created_at',{ascending:false}).limit(40);
  if(error){root.innerHTML=`<div class="msg">${esc(error.message)}</div>`;return}
  root.innerHTML=`<style>.feedv2{display:grid;gap:10px}.feedv2-card{background:#000;border-radius:18px;overflow:hidden;border:1px solid #244633}.feedv2-card video{width:100%;max-height:68vh;background:#000;display:block}.feedv2-meta{padding:12px}.feedv2-actions{display:flex;gap:8px;margin-top:9px}.feedv2-actions button{flex:1}</style><div class="feedv2">${(data||[]).map(v=>{const p=v.profiles||{},liked=(v.likes||[]).some(x=>x.user_id===uid());return `<article class="feedv2-card"><video controls playsinline preload="metadata" src="${esc(media('footshow-videos',v.storage_path))}"></video><div class="feedv2-meta"><b>${esc(p.full_name||p.username||'Joueur')}</b><div class="msg">${esc([p.position,p.category].filter(Boolean).join(' · '))}</div><div>${esc(v.caption||v.action_type||'Action')}</div><div class="feedv2-actions"><button class="secondary" data-fv-like="${v.id}" data-liked="${liked?'1':'0'}">${liked?'❤️':'♡'} ${(v.likes||[]).length}</button><button class="secondary" data-fv-profile="${v.user_id}">👤 Profil</button><button class="secondary" data-fv-comment="${v.id}">💬 ${(v.comments||[]).length}</button></div></div></article>`}).join('')||'<div class="msg">Aucune vidéo publiée.</div>'}</div>`;
  root.querySelectorAll('[data-fv-profile]').forEach(b=>b.onclick=()=>{d.classList.add('hidden');window.openPlayer?.(b.dataset.fvProfile)});
- root.querySelectorAll('[data-fv-comment]').forEach(b=>b.onclick=()=>window.commentOn?.(b.dataset.fvComment));
+ root.querySelectorAll('[data-fv-comment]').forEach(b=>b.onclick=()=>addFeedComment(b.dataset.fvComment));
  root.querySelectorAll('[data-fv-like]').forEach(b=>b.onclick=async()=>{const liked=b.dataset.liked==='1',id=b.dataset.fvLike;const r=liked?await sb.from('likes').delete().eq('video_id',id).eq('user_id',uid()):await sb.from('likes').insert({video_id:id,user_id:uid()});if(!r.error){b.dataset.liked=liked?'0':'1';openFeed();window.loadGlobalRanking?.()}});
 }
 async function openStats(){
@@ -39,7 +48,6 @@ document.addEventListener('click',e=>{
   if(e.target.closest('#openMessagesV2')){e.preventDefault();openInbox();}
   if(e.target.closest('#openStatsV2')){e.preventDefault();openStats();}
 });
-// Intercepte la déconnexion avant l'ancien gestionnaire qui rechargeait la page.
 document.addEventListener('click',async e=>{
  const btn=e.target.closest('#logoutBtn');
  if(!btn)return;
