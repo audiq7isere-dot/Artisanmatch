@@ -39,4 +39,23 @@ document.addEventListener('click',e=>{
   if(e.target.closest('#openMessagesV2')){e.preventDefault();openInbox();}
   if(e.target.closest('#openStatsV2')){e.preventDefault();openStats();}
 });
+// Intercepte la déconnexion avant l'ancien gestionnaire qui rechargeait la page.
+document.addEventListener('click',async e=>{
+ const btn=e.target.closest('#logoutBtn');
+ if(!btn)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ try{await sb.auth.signOut()}catch(_){ }
+ try{user=null;me=null;selectedPlayer=null}catch(_){ }
+ document.querySelectorAll('.drawer').forEach(d=>d.classList.add('hidden'));
+ document.getElementById('profilePane')?.classList.remove('open');
+ document.getElementById('app')?.classList.add('hidden');
+ document.getElementById('bottomNav')?.classList.add('hidden');
+ const auth=document.getElementById('auth');if(auth)auth.classList.remove('hidden');
+ document.getElementById('loginForm')?.classList.remove('hidden');
+ document.getElementById('signupForm')?.classList.add('hidden');
+ document.getElementById('loginTab')?.classList.add('active');
+ document.getElementById('signupTab')?.classList.remove('active');
+ const msg=document.getElementById('authMsg');if(msg)msg.textContent='';
+ window.scrollTo({top:0,behavior:'auto'});
+},true);
 })();
