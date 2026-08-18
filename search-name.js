@@ -23,5 +23,5 @@ function setupNameSearch(){
  document.getElementById('filterName').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();search()}});
  if(reset)reset.addEventListener('click',()=>{document.getElementById('filterName').value=''});
 }
-document.addEventListener('DOMContentLoaded',()=>{setTimeout(setupNameSearch,1800);const s=document.createElement('script');s.src='/music-feature.js';s.defer=true;document.body.appendChild(s)});
+document.addEventListener('DOMContentLoaded',()=>{setTimeout(setupNameSearch,1800);const s=document.createElement('script');s.src='/footshow-music-library.js';document.body.appendChild(s)});
 })();
