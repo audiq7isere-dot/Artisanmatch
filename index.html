@@ -59,20 +59,17 @@
           </div>
           <div class="filter-actions"><button id="applyFilters" class="primary">Filtrer</button><button id="resetFilters" class="secondary">Réinitialiser</button></div>
         </div>
-
         <div class="players-head"><span>Joueur</span><span>Poste</span><span>Catégorie</span><span></span></div>
         <div id="playersList" class="players"></div>
       </section>
-
-      <aside id="profilePane" class="profile-pane">
-        <div class="empty-profile">Sélectionne un joueur pour afficher son profil.</div>
-      </aside>
+      <aside id="profilePane" class="profile-pane"><div class="empty-profile">Sélectionne un joueur pour afficher son profil.</div></aside>
     </div>
   </section>
 </main>
 
 <nav id="bottomNav" class="bottom-nav hidden">
   <button data-view="home" class="nav active">⌂<small>Accueil</small></button>
+  <button id="messagesNav" data-view="messages" class="nav">💬<small>Messages</small><span id="messagesBadge" class="hidden" style="position:absolute;margin:-7px 0 0 -2px;background:#ef4444;color:#fff;border-radius:999px;min-width:17px;height:17px;padding:0 5px;font-size:10px;line-height:17px;font-weight:900"></span></button>
   <button data-view="profile" class="nav">👤<small>Mon profil</small></button>
   <button id="logoutBtn" class="nav">↪<small>Déconnexion</small></button>
 </nav>
@@ -96,7 +93,6 @@
     <label>Photo de profil</label><input id="avatarFile" type="file" accept="image/*" class="input">
     <label>Vidéo de présentation</label><input id="introFile" type="file" accept="video/*" class="input">
     <button id="saveProfileBtn" class="primary full">Enregistrer mon profil</button>
-
     <div class="section-title"><h3>🎬 Mes meilleures actions</h3><p>Ajoute tes buts, passes décisives, dribbles ou autres actions.</p></div>
     <label>Vidéo</label><input id="actionFile" type="file" accept="video/*" class="input">
     <div class="two"><div><label>Type d'action</label><select id="actionType" class="input"><option>But</option><option>Passe décisive</option><option>Dribble</option><option>Arrêt</option><option>Défense</option><option>Autre</option></select></div><div><label>Adversaire</label><input id="actionOpponent" class="input"></div></div>
@@ -108,9 +104,19 @@
   </div>
 </section>
 
+<section id="messagesDrawer" class="drawer hidden">
+  <div class="drawer-inner" style="max-width:720px">
+    <button id="closeMessages" class="close">×</button>
+    <h2>💬 Messages</h2>
+    <p class="msg">Tes conversations privées sur FootShow.</p>
+    <div id="conversationsList"></div>
+  </div>
+</section>
+
 <div id="toast" class="toast hidden"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script defer src="/footshow.js"></script>
 <script defer src="/videos-click.js"></script>
+<script defer src="/messages-inbox.js"></script>
 </body>
 </html>
