@@ -53,7 +53,6 @@
     document.getElementById('chatBack').onclick=()=>{box.remove();openInbox();};
     document.getElementById('chatSend').onclick=sendCurrent;
     document.getElementById('chatInput').addEventListener('keydown',ev=>{if(ev.key==='Enter'&&!ev.shiftKey){ev.preventDefault();sendCurrent();}});
-    // Tente de marquer comme lus si la politique Supabase le permet.
     await sb.from('messages').update({read_at:new Date().toISOString()}).eq('sender_id',otherId).eq('receiver_id',uid).is('read_at',null);
     refreshBadge();
   }
@@ -128,4 +127,115 @@
   });
 
   window.openFootShowConversation=openConversation;
+})();
+
+(()=>{
+  const GEO_URL='https://geo.api.gouv.fr/communes';
+  let lastProfilePostal='';
+
+  function setPostalUi(){
+    const fields=[
+      ['signupDepartment','Code postal','Ex. 73000'],
+      ['filterDepartment','Code postal','Ex. 73000'],
+      ['profileDepartment','Code postal','Ex. 73000']
+    ];
+    fields.forEach(([id,label,placeholder])=>{
+      const input=document.getElementById(id);if(!input)return;
+      const lab=input.previousElementSibling;
+      if(lab&&lab.tagName==='LABEL')lab.textContent=label;
+      input.removeAttribute('list');input.maxLength=5;input.inputMode='numeric';input.placeholder=placeholder;
+      input.setAttribute('autocomplete','postal-code');
+      input.addEventListener('input',()=>{input.value=input.value.replace(/\D/g,'').slice(0,5)});
+    });
+    document.getElementById('departmentsList')?.remove();
+
+    const signupPostal=document.getElementById('signupDepartment');
+    if(signupPostal&&!document.getElementById('signupCity')){
+      const wrap=document.createElement('div');
+      wrap.innerHTML='<label>Ville</label><input id="signupCity" class="input" placeholder="Remplie automatiquement" autocomplete="address-level2"><datalist id="signupCities"></datalist>';
+      signupPostal.parentElement?.parentElement?.insertAdjacentElement('afterend',wrap);
+    }
+    const profileCity=document.getElementById('profileCity');
+    if(profileCity){profileCity.setAttribute('list','profileCities');profileCity.placeholder='Remplie automatiquement';if(!document.getElementById('profileCities'))profileCity.insertAdjacentHTML('afterend','<datalist id="profileCities"></datalist>');}
+  }
+
+  async function citiesForPostal(postal){
+    if(!/^\d{5}$/.test(postal))return [];
+    try{
+      const r=await fetch(`${GEO_URL}?codePostal=${encodeURIComponent(postal)}&fields=nom,codesPostaux,population&format=json`);
+      if(!r.ok)return [];
+      const rows=await r.json();
+      return [...new Set((rows||[]).sort((a,b)=>(b.population||0)-(a.population||0)).map(x=>x.nom).filter(Boolean))];
+    }catch{return []}
+  }
+
+  async function autofill(postalId,cityId,listId){
+    const postal=document.getElementById(postalId)?.value.trim();
+    if(!/^\d{5}$/.test(postal))return;
+    const cities=await citiesForPostal(postal);
+    const city=document.getElementById(cityId),list=document.getElementById(listId);
+    if(list)list.innerHTML=cities.map(x=>`<option value="${String(x).replace(/"/g,'&quot;')}"></option>`).join('');
+    if(city&&cities.length){if(!cities.includes(city.value))city.value=cities[0];city.setAttribute('list',listId);}
+  }
+
+  async function loadPlayersPostal(){
+    const postal=document.getElementById('filterDepartment')?.value.trim();
+    const pos=document.getElementById('filterPosition')?.value||'';
+    const cat=document.getElementById('filterCategory')?.value||'';
+    let q=sb.from('profiles').select('id,full_name,username,avatar_url,position,category,postal_code,city').eq('account_type','player').order('full_name',{ascending:true});
+    if(postal)q=q.eq('postal_code',postal);
+    if(pos)q=q.eq('position',pos);
+    if(cat)q=q.eq('category',cat);
+    const {data,error}=await q.limit(250),root=document.getElementById('playersList');
+    if(error){root.innerHTML=`<div class="panel">${esc(error.message)}</div>`;return}
+    if(!data?.length){root.innerHTML='<div class="panel">Aucun joueur trouvé.</div>';return}
+    root.innerHTML=data.map(x=>`<div class="player-row" data-id="${x.id}" onclick="openPlayer('${x.id}')"><div class="player-name"><img class="mini-avatar" src="${esc(media('avatars',x.avatar_url))}" onerror="this.style.visibility='hidden'"><span>${esc(x.full_name||x.username||'Joueur')}</span></div><div>${esc(x.position||'—')}</div><div>${esc(x.category||'—')}</div><div class="arrow">›</div></div>`).join('');
+  }
+
+  function patchHandlers(){
+    const signupPostal=document.getElementById('signupDepartment');
+    signupPostal?.addEventListener('input',()=>{if(signupPostal.value.length===5)autofill('signupDepartment','signupCity','signupCities')});
+    const profilePostal=document.getElementById('profileDepartment');
+    profilePostal?.addEventListener('input',()=>{if(profilePostal.value.length===5)autofill('profileDepartment','profileCity','profileCities')});
+
+    const filterBtn=document.getElementById('applyFilters');if(filterBtn)filterBtn.onclick=loadPlayersPostal;
+    const reset=document.getElementById('resetFilters');if(reset)reset.onclick=()=>{document.getElementById('filterDepartment').value='';document.getElementById('filterPosition').value='';document.getElementById('filterCategory').value='';loadPlayersPostal()};
+
+    const signup=document.getElementById('signupBtn');if(signup)signup.onclick=async()=>{
+      const postal=document.getElementById('signupDepartment').value.trim();
+      if(document.getElementById('signupType').value==='player'&&postal&&!/^\d{5}$/.test(postal)){document.getElementById('authMsg').textContent='Entre un code postal à 5 chiffres.';return}
+      if(postal)await autofill('signupDepartment','signupCity','signupCities');
+      const meta={full_name:document.getElementById('signupName').value.trim(),username:document.getElementById('signupUsername').value.trim(),account_type:document.getElementById('signupType').value,position:document.getElementById('signupPosition').value||null,category:document.getElementById('signupCategory').value||null,postal_code:postal||null,city:document.getElementById('signupCity')?.value.trim()||null,department:null};
+      const {data,error}=await sb.auth.signUp({email:document.getElementById('signupEmail').value.trim(),password:document.getElementById('signupPassword').value,options:{data:meta}});
+      if(error){document.getElementById('authMsg').textContent=error.message;return}
+      if(data.session){user=data.user;await enterApp()}else document.getElementById('authMsg').textContent='Compte créé. Vérifie ton e-mail de confirmation.';
+    };
+
+    const save=document.getElementById('saveProfileBtn');if(save)save.onclick=async()=>{
+      try{
+        const postal=document.getElementById('profileDepartment').value.trim();
+        if(postal&&!/^\d{5}$/.test(postal))throw new Error('Entre un code postal à 5 chiffres');
+        if(postal)await autofill('profileDepartment','profileCity','profileCities');
+        let avatar=me.avatar_url,intro=me.intro_video_path;
+        const af=document.getElementById('avatarFile').files[0],vf=document.getElementById('introFile').files[0];
+        if(af){const ext=af.name.split('.').pop()||'jpg';avatar=await uploadFile('avatars',af,`${user.id}/${Date.now()}.${ext}`)}
+        if(vf){if(vf.size>80*1024*1024)throw new Error('Vidéo de présentation : 80 Mo maximum');const ext=vf.name.split('.').pop()||'mp4';intro=await uploadFile('footshow-videos',vf,`${user.id}/intro-${Date.now()}.${ext}`)}
+        const patch={position:document.getElementById('profilePosition').value||null,category:document.getElementById('profileCategory').value||null,postal_code:postal||null,department:null,club:document.getElementById('profileClub').value.trim()||null,city:document.getElementById('profileCity').value.trim()||null,level:document.getElementById('profileLevel').value.trim()||null,foot:document.getElementById('profileFoot').value||null,height_cm:document.getElementById('profileHeight').value?Number(document.getElementById('profileHeight').value):null,bio:document.getElementById('profileBio').value.trim()||null,avatar_url:avatar,intro_video_path:intro};
+        const {error}=await sb.from('profiles').update(patch).eq('id',user.id);if(error)throw error;
+        await loadMe();window.openMyProfile?.();loadPlayersPostal();toast('Profil enregistré');
+      }catch(err){toast(err.message)}
+    };
+  }
+
+  const originalOpenMyProfile=window.openMyProfile;
+  if(originalOpenMyProfile)window.openMyProfile=function(){originalOpenMyProfile();const p=document.getElementById('profileDepartment');if(p)p.value=me?.postal_code||'';const c=document.getElementById('profileCity');if(c)c.value=me?.city||'';if(p?.value.length===5)autofill('profileDepartment','profileCity','profileCities')};
+
+  const originalOpenPlayer=window.openPlayer;
+  if(originalOpenPlayer)window.openPlayer=async function(id){await originalOpenPlayer(id);const {data:p}=await sb.from('profiles').select('postal_code,city').eq('id',id).single();const chips=document.querySelector('#profilePane .chips');if(chips){[...chips.children].forEach(ch=>{if((ch.textContent||'').startsWith('Département '))ch.remove()});if(p?.postal_code){const chip=document.createElement('span');chip.className='chip';chip.textContent=`📍 ${p.postal_code}${p.city?' '+p.city:''}`;chips.prepend(chip)}}};
+
+  document.addEventListener('DOMContentLoaded',()=>{
+    setPostalUi();patchHandlers();
+    const nav=document.querySelector('.nav[data-view="profile"]');
+    if(nav)nav.onclick=()=>{document.querySelectorAll('.nav').forEach(x=>x.classList.toggle('active',x===nav));window.openMyProfile?.()};
+  });
 })();
